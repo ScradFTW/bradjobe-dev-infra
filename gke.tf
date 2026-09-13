@@ -78,3 +78,30 @@ resource "google_container_node_pool" "llm_gpu" {
   # not a workload that needs to grow, and a fixed Spot pool keeps the
   # monthly cost predictable. Bump llm_gpu_node_count if that changes.
 }
+
+# Temporary CPU-only fallback while the GPU quota request is pending (see
+# llm_gpu above) — same llama-server, no CUDA, `-ngl 0`, exactly what the
+# old VPS ran. Needs no GPU quota at all, so it's not blocked on Google.
+# Deliberately several nodes rather than the bare minimum: this is also
+# meant to demonstrate a real multi-node GKE deployment. Remove this pool
+# (and qwen-llm-gke's k8s/deployment-cpu.yaml) once the GPU pool is live —
+# see that repo's README for the swap-back steps.
+resource "google_container_node_pool" "llm_cpu" {
+  name     = "llm-cpu-pool"
+  cluster  = google_container_cluster.llm.id
+  location = var.zone
+  project  = var.project_id
+
+  node_count = var.llm_cpu_node_count
+
+  node_config {
+    machine_type    = var.llm_cpu_machine_type
+    spot            = true
+    service_account = google_service_account.gke_node.email
+    oauth_scopes    = ["https://www.googleapis.com/auth/cloud-platform"]
+
+    labels = {
+      workload = "qwen-llm-cpu"
+    }
+  }
+}

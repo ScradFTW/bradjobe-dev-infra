@@ -97,3 +97,15 @@ variable "llm_gpu_machine_type" {
   type        = string
   default     = "n1-standard-2"
 }
+
+variable "llm_cpu_node_count" {
+  description = "Size of the temporary CPU-only fallback pool (gke.tf's llm_cpu) while GPU quota is pending. Deliberately more than the GPU pool's floor of 2 — this also doubles as a visible multi-node GKE demo."
+  type        = number
+  default     = 4
+}
+
+variable "llm_cpu_machine_type" {
+  description = "Cheap, no-GPU machine type for the temporary CPU fallback pool — needs no GPU quota at all."
+  type        = string
+  default     = "e2-small"
+}
