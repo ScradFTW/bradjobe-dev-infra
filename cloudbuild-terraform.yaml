@@ -1,0 +1,27 @@
+# Runs INSIDE Cloud Build only, as the `terraform-infra` service account
+# (iam.tf) — see cloudbuild_triggers.tf for the two triggers that invoke
+# this: a read-only `plan` on every PR, and `apply -auto-approve` on push
+# to main. This is the only place `terraform apply` against bradjobe-dev
+# is ever allowed to run; there is deliberately no local/laptop path.
+steps:
+  - id: init
+    name: "hashicorp/terraform:1.9"
+    entrypoint: sh
+    args:
+      - -c
+      - terraform init -input=false
+
+  - id: tf-command
+    name: "hashicorp/terraform:1.9"
+    entrypoint: sh
+    args:
+      - -c
+      - "terraform $_TF_COMMAND -input=false"
+
+substitutions:
+  _TF_COMMAND: plan
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+
+timeout: 1200s
