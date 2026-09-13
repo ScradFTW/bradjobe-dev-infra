@@ -39,8 +39,22 @@ resource "google_compute_instance" "ccaas" {
 
   tags = ["ccaas-vm"]
 
+  # OS Login, not metadata SSH keys, was the original plan here — but OS
+  # Login for a SERVICE ACCOUNT identity (as opposed to a human user; the
+  # cloudbuild-app-deployer SA correctly resolved to POSIX user
+  # sa_<uniqueId>, confirmed against a human login that worked fine on
+  # the same VM) consistently hit "Permission denied (publickey)" even
+  # after retries, with no further diagnosis possible without dropping
+  # into Google support. This is the same dedicated-keypair-via-metadata
+  # pattern Google's own Cloud Build + Compute Engine deploy guides use,
+  # specifically because CI-service-account OS Login has exactly this
+  # kind of friction. Public key only — the private half lives in Secret
+  # Manager (ccaas-deploy-ssh-private-key, created out of band, not by
+  # Terraform, so it never touches state) and cloudbuild.yaml pulls it at
+  # deploy time.
   metadata = {
-    enable-oslogin = "TRUE"
+    enable-oslogin = "FALSE"
+    ssh-keys       = "clouddeploy:ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGcrkJTdSN/fZkOCAH0humHOgP+n1GbsCFOep91r1q+k clouddeploy"
   }
 
   metadata_startup_script = <<-EOT

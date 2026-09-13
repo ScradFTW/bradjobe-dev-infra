@@ -33,3 +33,30 @@ resource "google_secret_manager_secret_iam_member" "ccaas_vm_can_read" {
 # service agent access to it) as part of installing the GitHub App during
 # bootstrap. cloudbuild.tf's data.google_cloudbuildv2_connection just
 # references that connection by name — Terraform never owns this secret.
+
+# Private half of the ccaas-vm deploy keypair (see gce_ccaas.tf's
+# metadata for the public half and why this replaced OS Login). Created
+# out of band (`gcloud secrets create` + `versions add`) specifically so
+# the private key material never passes through a terraform variable or
+# state — adopted here the same way as the other bootstrap-created
+# resources, via import.
+resource "google_secret_manager_secret" "ccaas_deploy_ssh_key" {
+  project   = var.project_id
+  secret_id = "ccaas-deploy-ssh-private-key"
+
+  replication {
+    auto {}
+  }
+}
+
+import {
+  to = google_secret_manager_secret.ccaas_deploy_ssh_key
+  id = "projects/${var.project_id}/secrets/ccaas-deploy-ssh-private-key"
+}
+
+resource "google_secret_manager_secret_iam_member" "cloudbuild_can_read_ccaas_deploy_key" {
+  project   = var.project_id
+  secret_id = google_secret_manager_secret.ccaas_deploy_ssh_key.secret_id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.cloudbuild_app_deployer.email}"
+}
