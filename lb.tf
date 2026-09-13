@@ -32,6 +32,41 @@ resource "google_compute_url_map" "main" {
     name            = "main"
     default_service = module.bradjobe_site.backend_service_id
 
+    # Bare demo paths (no trailing slash) redirect, same as the current
+    # nginx `location = /genre-classifier { return 301 /genre-classifier/; }`
+    # style rules — every prefix-matched route below only matches WITH the
+    # trailing slash, so without this a bare path would silently fall
+    # through to bradjobe-site and 404. One rule per path since
+    # url_redirect's path_redirect is a fixed string, not derived from
+    # whatever matched.
+    # Priority is a bare precedence number (lower = matched first), not a
+    # negative offset — GCP requires it non-negative. These don't overlap
+    # with any other rule's match (full_path_match is exact, distinct from
+    # the prefix_match rules elsewhere that all require a trailing "/"),
+    # so their exact value relative to the others doesn't matter.
+    dynamic "route_rules" {
+      for_each = {
+        "/llm-testing"      = 30
+        "/genre-classifier" = 31
+        "/agent-demo"       = 32
+        "/image-classifier" = 33
+        "/status"           = 34
+        "/ai"               = 35
+        "/pose-tracker"     = 36
+      }
+      content {
+        priority = route_rules.value
+        match_rules {
+          full_path_match = route_rules.key
+        }
+        url_redirect {
+          path_redirect          = "${route_rules.key}/"
+          redirect_response_code = "MOVED_PERMANENTLY_DEFAULT"
+          strip_query             = false
+        }
+      }
+    }
+
     # --- most specific: API subpaths (checked ahead of the SPA prefixes
     # below since a request can only match one route_rule) ---
     route_rules {
