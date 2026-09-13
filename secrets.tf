@@ -28,30 +28,8 @@ resource "google_secret_manager_secret_iam_member" "ccaas_vm_can_read" {
   member    = "serviceAccount:${google_service_account.ccaas_vm.email}"
 }
 
-# GitHub App OAuth token backing the Cloud Build v2 GitHub connection
-# (cloudbuild.tf). Created empty here; the real value is a personal access
-# token / GitHub App token added once by hand during bootstrap — see
-# README.md "Bootstrap", step 4.
-resource "google_secret_manager_secret" "github_oauth_token" {
-  project   = var.project_id
-  secret_id = "github-oauth-token"
-
-  replication {
-    auto {}
-  }
-
-  depends_on = [google_project_service.apis]
-}
-
-resource "google_secret_manager_secret_iam_member" "cloudbuild_sa_can_read_github_token" {
-  project   = var.project_id
-  secret_id = google_secret_manager_secret.github_oauth_token.secret_id
-  role      = "roles/secretmanager.secretAccessor"
-  # Cloud Build v2's own service agent reads this to authenticate to GitHub
-  # on Terraform's behalf — not either of the deploy identities above.
-  member = "serviceAccount:service-${data.google_project.this.number}@gcp-sa-cloudbuild.iam.gserviceaccount.com"
-}
-
-data "google_project" "this" {
-  project_id = var.project_id
-}
+# No github-oauth-token secret here: the Cloud Console's "Connect
+# Repository" flow creates its own secret (and grants Cloud Build's
+# service agent access to it) as part of installing the GitHub App during
+# bootstrap. cloudbuild.tf's data.google_cloudbuildv2_connection just
+# references that connection by name — Terraform never owns this secret.

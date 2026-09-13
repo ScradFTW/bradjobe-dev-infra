@@ -1,22 +1,14 @@
-# One GitHub connection for the whole account, one google_cloudbuildv2_repository
-# per repo Cloud Build needs to react to. The connection's underlying GitHub
-# App installation is a one-time manual step — see README.md "Bootstrap".
-resource "google_cloudbuildv2_connection" "github" {
+# The connection itself (GitHub App installation + its OAuth token secret)
+# is created by the Cloud Console's "Connect Repository" flow during
+# bootstrap, not by Terraform — that flow's GitHub OAuth consent step is
+# inherently interactive and can't be scripted. This is a data source, not
+# a resource, precisely because Terraform doesn't own its lifecycle; it
+# only needs to reference it to attach repositories. See README.md
+# "Bootstrap".
+data "google_cloudbuildv2_connection" "github" {
   project  = var.project_id
   location = var.region
-  name     = "github-${lower(var.github_owner)}"
-
-  github_config {
-    app_installation_id = var.github_app_installation_id
-    authorizer_credential {
-      oauth_token_secret_version = "${google_secret_manager_secret.github_oauth_token.id}/versions/latest"
-    }
-  }
-
-  depends_on = [
-    google_project_service.apis,
-    google_secret_manager_secret_iam_member.cloudbuild_sa_can_read_github_token,
-  ]
+  name     = "scradftw-github"
 }
 
 resource "google_cloudbuildv2_repository" "apps" {
@@ -25,7 +17,7 @@ resource "google_cloudbuildv2_repository" "apps" {
   project           = var.project_id
   location          = var.region
   name              = each.value
-  parent_connection = google_cloudbuildv2_connection.github.name
+  parent_connection = data.google_cloudbuildv2_connection.github.name
   remote_uri        = "https://github.com/${var.github_owner}/${each.value}.git"
 }
 
@@ -36,6 +28,18 @@ resource "google_cloudbuildv2_repository" "infra" {
   project           = var.project_id
   location          = var.region
   name              = "bradjobe-dev-infra"
-  parent_connection = google_cloudbuildv2_connection.github.name
+  parent_connection = data.google_cloudbuildv2_connection.github.name
   remote_uri        = "https://github.com/${var.github_owner}/bradjobe-dev-infra.git"
+}
+
+# This one had to be created by hand during bootstrap (`gcloud builds
+# repositories create bradjobe-dev-infra ...`): the bootstrap trigger
+# needs it to exist before the first `terraform apply` can ever run, so
+# it can't be the thing that first apply creates. This import block makes
+# that same first apply reconcile onto the existing resource instead of
+# failing with "already exists" — no separate `terraform import` command
+# needed (there's nowhere to run one from — see versions.tf).
+import {
+  to = google_cloudbuildv2_repository.infra
+  id = "projects/${var.project_id}/locations/${var.region}/connections/scradftw-github/repositories/bradjobe-dev-infra"
 }

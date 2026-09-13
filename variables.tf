@@ -34,18 +34,6 @@ variable "github_owner" {
   default     = "ScradFTW"
 }
 
-variable "github_app_installation_id" {
-  description = <<-EOT
-    Installation ID of the "Google Cloud Build" GitHub App on var.github_owner's
-    account. There is no API to install a GitHub App non-interactively — install
-    it once via the Cloud Console (Cloud Build > Repositories > Connect
-    Repository > GitHub), then read the ID back out of the installation's
-    settings URL (github.com/settings/installations/<this number>). See
-    README.md "Bootstrap".
-  EOT
-  type        = string
-}
-
 variable "app_repos" {
   description = "Every application repo Cloud Build needs a connection to, keyed by short name."
   type        = set(string)

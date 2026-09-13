@@ -120,21 +120,36 @@ setup that the self-hosted pipeline then takes over from.
    no drift, `iam.tf` defines the identical account + roles.)
 
 3. **Install the Cloud Build GitHub App** on the `ScradFTW` account:
-   Cloud Console → Cloud Build → Repositories → "Connect Repository" →
-   GitHub → authorize the app, grant it access to all 7 repos this
-   project touches (`bradjobe.dev`, `demos-ui`, `llm-testing-deploy`,
-   `pose-tracker`, `ccaas`, `qwen-llm-gke`, `bradjobe-dev-infra`). This
-   step is inherently interactive (GitHub OAuth consent) and can't be
-   scripted. Note the installation ID from the URL Cloud Console lands
-   you on after — that's `github_app_installation_id`.
+   Cloud Console → Cloud Build → Repositories (2nd gen) → "Create Host
+   Connection" → GitHub → authorize the app, grant it access to all 7
+   repos this project touches (`bradjobe.dev`, `demos-ui`,
+   `llm-testing-deploy`, `pose-tracker`, `ccaas`, `qwen-llm-gke`,
+   `bradjobe-dev-infra`). This step is inherently interactive (GitHub
+   OAuth consent) and can't be scripted.
 
-4. **Create the GitHub token secret Terraform's connection resource
-   expects**, using a GitHub PAT (classic, `repo` + `read:org` scopes) or
-   the token Cloud Console showed you in step 3:
+   This single step does more than it looks like: the console flow
+   creates the `google_cloudbuildv2_connection` itself (named
+   `scradftw-github`) *and* a Secret Manager secret holding its GitHub
+   token, already granted to Cloud Build's service agent. `cloudbuild.tf`
+   deliberately has no `resource` for either — only a `data
+   "google_cloudbuildv2_connection"` reading `scradftw-github` by name.
+   Terraform never owns this connection's lifecycle.
+
+4. **Register this repo with that connection**, and tell Terraform about
+   the resource that creates so its first apply doesn't try to create a
+   duplicate:
    ```sh
-   gcloud secrets create github-oauth-token --replication-policy=automatic
-   echo -n "<token>" | gcloud secrets versions add github-oauth-token --data-file=-
+   gcloud builds repositories create bradjobe-dev-infra \
+     --connection=scradftw-github --region=northamerica-northeast1 \
+     --remote-uri=https://github.com/ScradFTW/bradjobe-dev-infra.git
    ```
+   `cloudbuild.tf` has a matching `import` block for
+   `google_cloudbuildv2_repository.infra` — the first real `terraform
+   apply` (step 6) reconciles onto this resource instead of failing with
+   "already exists". This is the only repo that needs this: the other 6
+   have no chicken-and-egg problem, since nothing has to exist before
+   Terraform creates their `google_cloudbuildv2_repository` resources
+   normally.
 
 5. **Create the one bootstrap trigger** that lets push-to-main on *this*
    repo start applying itself (after this, `cloudbuild_triggers.tf`'s
@@ -144,13 +159,11 @@ setup that the self-hosted pipeline then takes over from.
    ```sh
    gcloud builds triggers create github \
      --name=terraform-apply-on-main --region=northamerica-northeast1 \
-     --repository=projects/bradjobe-dev/locations/northamerica-northeast1/connections/github-scradftw/repositories/bradjobe-dev-infra \
+     --repository=projects/bradjobe-dev/locations/northamerica-northeast1/connections/scradftw-github/repositories/bradjobe-dev-infra \
      --branch-pattern="^main$" --build-config=cloudbuild-terraform.yaml \
      --substitutions=_TF_COMMAND="apply -auto-approve" \
      --service-account=projects/bradjobe-dev/serviceAccounts/terraform-infra@bradjobe-dev.iam.gserviceaccount.com
    ```
-   (If step 3/4 haven't propagated yet, this command fails cleanly — no
-   partial state to unwind. Retry once the connection exists.)
 
 6. **Push this repo's `main` branch.** The trigger from step 5 fires,
    applies everything in this repo (VPC, GKE, Cloud Run shells, the ccaas
