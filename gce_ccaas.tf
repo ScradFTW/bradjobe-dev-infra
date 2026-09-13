@@ -141,6 +141,18 @@ resource "google_compute_instance" "ccaas" {
   # doesn't require the old instance to still exist.
 }
 
+# A freshly-created instance's URL is sometimes rejected by the instance
+# group API ("invalid instance URLs") for a few seconds after
+# google_compute_instance reports creation complete — an eventual-
+# consistency gap between Compute Engine and the instance-group service,
+# observed directly (the group update failed immediately after the
+# instance's own "Creation complete" log line, on a plain create with no
+# replacement involved). A short wait bridges it.
+resource "time_sleep" "wait_for_ccaas_instance" {
+  create_duration = "30s"
+  depends_on      = [google_compute_instance.ccaas]
+}
+
 # Unmanaged instance group so this single VM can be an External HTTPS LB
 # backend (lb.tf) — Terraform-managed, no autoscaling since ccaas is
 # stateful (SQLite + per-user Docker state) and was never designed to run
@@ -151,6 +163,8 @@ resource "google_compute_instance_group" "ccaas" {
   zone    = var.zone
 
   instances = [google_compute_instance.ccaas.id]
+
+  depends_on = [time_sleep.wait_for_ccaas_instance]
 
   named_port {
     name = "http"
