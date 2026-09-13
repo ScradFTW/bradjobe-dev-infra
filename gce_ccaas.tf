@@ -101,6 +101,13 @@ resource "google_compute_instance" "ccaas" {
 
     echo "base image ready — application deploy happens via Cloud Build (see ccaas/cloudbuild.yaml)"
   EOT
+
+  # Matches google_compute_instance_group.ccaas below: Terraform requires
+  # this when a resource with create_before_destroy (the instance group)
+  # depends on one that doesn't, and is itself being replaced.
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 # Unmanaged instance group so this single VM can be an External HTTPS LB
@@ -117,6 +124,17 @@ resource "google_compute_instance_group" "ccaas" {
   named_port {
     name = "http"
     port = 80
+  }
+
+  # A zone change (or any other forced replacement of the instance/group)
+  # must create the replacement before destroying the original: the old
+  # group can't be deleted while gce_ccaas.tf's backend_service still
+  # points at it, and Terraform won't repoint the backend_service to a
+  # group that doesn't exist yet. Names are zone-scoped, so the old and
+  # new resources coexisting briefly under the same name in different
+  # zones is not a conflict.
+  lifecycle {
+    create_before_destroy = true
   }
 }
 

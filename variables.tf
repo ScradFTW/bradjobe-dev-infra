@@ -54,9 +54,20 @@ variable "ccaas_machine_type" {
 }
 
 variable "llm_gpu_node_count" {
-  description = "Fixed size of the GPU node pool serving the Qwen LLM demo. \"At least two\" per requirements; kept fixed (no autoscaler) so Spot cost stays predictable."
+  description = <<-EOT
+    Fixed size of the GPU node pool serving the Qwen LLM demo. "At least
+    two" per requirements; kept fixed (no autoscaler) so Spot cost stays
+    predictable.
+
+    TEMPORARILY 1, not 2: this project's self-service Preemptible NVIDIA
+    T4 GPU quota in northamerica-northeast1 is capped at 1 (new-project
+    default) — self-service override tops out at 1, a real increase needs
+    Google's manual review. Bump this back to 2 once that request is
+    approved (`gcloud alpha services quota list --service=compute.googleapis.com
+    --consumer=projects/bradjobe-dev --filter=metric:NVIDIA_T4_GPUS` to check).
+  EOT
   type        = number
-  default     = 2
+  default     = 1
 }
 
 variable "llm_gpu_type" {
