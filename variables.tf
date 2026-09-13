@@ -11,9 +11,9 @@ variable "region" {
 }
 
 variable "zone" {
-  description = "Zone for the (zonal) GKE cluster, the ccaas VM, and the GPU node pool."
+  description = "Zone for the (zonal) GKE cluster, the ccaas VM, and the GPU node pool. Must be -c: that's the only zone in this region with nvidia-tesla-t4 capacity (confirmed via `gcloud compute accelerator-types list` — -a and -b don't have it)."
   type        = string
-  default     = "northamerica-northeast1-a"
+  default     = "northamerica-northeast1-c"
 }
 
 variable "domain" {

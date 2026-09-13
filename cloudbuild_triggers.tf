@@ -119,6 +119,12 @@ resource "google_cloudbuild_trigger" "terraform_apply_on_main" {
   substitutions = {
     _TF_COMMAND = "apply -auto-approve"
   }
+}
 
-  depends_on = [google_project_iam_member.terraform_infra_roles]
+# Created by hand during bootstrap (README.md step 5) — this exact
+# trigger is what runs the very first terraform apply, so it can't be
+# created BY that apply. Adopted here instead of recreated/duplicated.
+import {
+  to = google_cloudbuild_trigger.terraform_apply_on_main
+  id = "projects/${var.project_id}/locations/${var.region}/triggers/4f3aa236-c0e7-4c60-98cf-4747c73c19dc"
 }

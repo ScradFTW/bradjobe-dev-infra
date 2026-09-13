@@ -94,6 +94,14 @@ resource "google_service_account" "terraform_infra" {
   display_name = "Cloud Build — terraform apply for bradjobe-dev-infra"
 }
 
+# Created by hand during bootstrap (README.md step 2) — has to exist
+# before the first terraform apply can run as it, so it can't be the
+# thing that first apply creates. Adopted here instead of recreated.
+import {
+  to = google_service_account.terraform_infra
+  id = "projects/${var.project_id}/serviceAccounts/terraform-infra@${var.project_id}.iam.gserviceaccount.com"
+}
+
 resource "google_project_iam_member" "terraform_infra_roles" {
   for_each = toset([
     "roles/run.admin",

@@ -32,41 +32,6 @@ resource "google_compute_url_map" "main" {
     name            = "main"
     default_service = module.bradjobe_site.backend_service_id
 
-    # Bare demo paths (no trailing slash) redirect, same as the current
-    # nginx `location = /genre-classifier { return 301 /genre-classifier/; }`
-    # style rules — every prefix-matched route below only matches WITH the
-    # trailing slash, so without this a bare path would silently fall
-    # through to bradjobe-site and 404. One rule per path since
-    # url_redirect's path_redirect is a fixed string, not derived from
-    # whatever matched.
-    # Priority is a bare precedence number (lower = matched first), not a
-    # negative offset — GCP requires it non-negative. These don't overlap
-    # with any other rule's match (full_path_match is exact, distinct from
-    # the prefix_match rules elsewhere that all require a trailing "/"),
-    # so their exact value relative to the others doesn't matter.
-    dynamic "route_rules" {
-      for_each = {
-        "/llm-testing"      = 30
-        "/genre-classifier" = 31
-        "/agent-demo"       = 32
-        "/image-classifier" = 33
-        "/status"           = 34
-        "/ai"               = 35
-        "/pose-tracker"     = 36
-      }
-      content {
-        priority = route_rules.value
-        match_rules {
-          full_path_match = route_rules.key
-        }
-        url_redirect {
-          path_redirect          = "${route_rules.key}/"
-          redirect_response_code = "MOVED_PERMANENTLY_DEFAULT"
-          strip_query             = false
-        }
-      }
-    }
-
     # --- most specific: API subpaths (checked ahead of the SPA prefixes
     # below since a request can only match one route_rule) ---
     route_rules {
@@ -186,6 +151,95 @@ resource "google_compute_url_map" "main" {
         prefix_match = "/status/"
       }
       service = module.ai_tools.backend_service_id
+    }
+
+    # Bare demo paths (no trailing slash) redirect, same as the current
+    # nginx `location = /genre-classifier { return 301 /genre-classifier/; }`
+    # style rules — every prefix-matched route above only matches WITH the
+    # trailing slash, so without this a bare path would silently fall
+    # through to bradjobe-site and 404. Written as 7 literal blocks, not a
+    # `dynamic` over a map, deliberately: GCP requires each route_rule's
+    # priority to be strictly higher than the previous one IN DECLARATION
+    # ORDER, and a `dynamic` block over a map iterates in sorted-key order
+    # (alphabetical by path here), not the order the map was written in —
+    # that would silently reorder these to 32, 35, 31, 33, 30, 36, 34 and
+    # fail the same validation this is fixing.
+    route_rules {
+      priority = 30
+      match_rules {
+        full_path_match = "/llm-testing"
+      }
+      url_redirect {
+        path_redirect          = "/llm-testing/"
+        redirect_response_code = "MOVED_PERMANENTLY_DEFAULT"
+        strip_query             = false
+      }
+    }
+    route_rules {
+      priority = 31
+      match_rules {
+        full_path_match = "/genre-classifier"
+      }
+      url_redirect {
+        path_redirect          = "/genre-classifier/"
+        redirect_response_code = "MOVED_PERMANENTLY_DEFAULT"
+        strip_query             = false
+      }
+    }
+    route_rules {
+      priority = 32
+      match_rules {
+        full_path_match = "/agent-demo"
+      }
+      url_redirect {
+        path_redirect          = "/agent-demo/"
+        redirect_response_code = "MOVED_PERMANENTLY_DEFAULT"
+        strip_query             = false
+      }
+    }
+    route_rules {
+      priority = 33
+      match_rules {
+        full_path_match = "/image-classifier"
+      }
+      url_redirect {
+        path_redirect          = "/image-classifier/"
+        redirect_response_code = "MOVED_PERMANENTLY_DEFAULT"
+        strip_query             = false
+      }
+    }
+    route_rules {
+      priority = 34
+      match_rules {
+        full_path_match = "/status"
+      }
+      url_redirect {
+        path_redirect          = "/status/"
+        redirect_response_code = "MOVED_PERMANENTLY_DEFAULT"
+        strip_query             = false
+      }
+    }
+    route_rules {
+      priority = 35
+      match_rules {
+        full_path_match = "/ai"
+      }
+      url_redirect {
+        path_redirect          = "/ai/"
+        redirect_response_code = "MOVED_PERMANENTLY_DEFAULT"
+        strip_query             = false
+      }
+    }
+    route_rules {
+      priority = 36
+      match_rules {
+        full_path_match = "/pose-tracker"
+      }
+      url_redirect {
+        path_redirect          = "/pose-tracker/"
+        redirect_response_code = "MOVED_PERMANENTLY_DEFAULT"
+        strip_query             = false
+      }
     }
   }
 }
