@@ -31,7 +31,16 @@ resource "google_container_cluster" "llm" {
   depends_on = [google_project_service.apis]
 }
 
+# count, not a plain resource: this project's GPUs-all-regions quota is
+# 0 (a fresh-project default, confirmed via `gcloud alpha services quota
+# update ... --value=2` -> COMMON_QUOTA_CONSUMER_OVERRIDE_TOO_HIGH, max
+# 0), so node creation fails regardless of node_count until Google
+# approves a real increase — see README.md "GPU quota". Rather than block
+# every other resource in this repo on that manual review, this pool is
+# opt-in via enable_llm_gpu_pool until it's approved.
 resource "google_container_node_pool" "llm_gpu" {
+  count = var.enable_llm_gpu_pool ? 1 : 0
+
   name     = "llm-gpu-pool"
   cluster  = google_container_cluster.llm.id
   location = var.zone

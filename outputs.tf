@@ -22,7 +22,7 @@ output "gke_cluster_name" {
 }
 
 output "ccaas_vm_internal_ip" {
-  value = google_compute_address.ccaas_internal.address
+  value = google_compute_instance.ccaas.network_interface[0].network_ip
 }
 
 output "cloud_run_urls" {

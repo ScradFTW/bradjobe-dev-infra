@@ -4,14 +4,6 @@
 # `/sites/<slug>/` publishing feature (writes a config fragment + sudo-
 # scoped reload — see ccaas/apps/backend/src/sites.js). Neither fits
 # Cloud Run's sandboxed runtime, so this one service gets a VM instead.
-resource "google_compute_address" "ccaas_internal" {
-  name         = "ccaas-vm-internal-ip"
-  project      = var.project_id
-  region       = var.region
-  subnetwork   = google_compute_subnetwork.main.id
-  address_type = "INTERNAL"
-}
-
 resource "google_compute_instance" "ccaas" {
   name         = "ccaas-vm"
   project      = var.project_id
@@ -27,7 +19,13 @@ resource "google_compute_instance" "ccaas" {
 
   network_interface {
     subnetwork = google_compute_subnetwork.main.id
-    network_ip = google_compute_address.ccaas_internal.address
+    # No explicit network_ip: a reserved static internal address here
+    # actively broke create_before_destroy — the replacement instance
+    # would try to claim the same IP the still-live original was using.
+    # Nothing else in this repo references this VM by IP (the LB reaches
+    # it through the instance group, gce_ccaas.tf below), so there's no
+    # reason to pin it.
+    #
     # No access_config block: no public IP. Reached only via the load
     # balancer (lb.tf) and administered only via IAP SSH tunneling
     # (network.tf's allow-iap-ssh rule), matching the "everything behind
