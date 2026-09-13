@@ -214,9 +214,10 @@ the SSH redeploy step), not Terraform's.
 | `ccaas-vm` (e2-medium, always-on) | ~$25 |
 | Cloud Run (7 services, scale-to-zero, low traffic) | ~$0–10 |
 | Global external HTTPS LB (forwarding rules + data processed) | ~$18+ |
+| Cloud NAT (ccaas-vm's + GKE nodes' internet egress) | ~$32 gateway + ~$0.045/GB processed |
 | Cloud DNS zone | ~$0.20 + queries |
 | Artifact Registry storage | ~$1–2 |
-| **Total** | **roughly $100–150/mo**, dominated by the GPU nodes and the always-on LB/VM |
+| **Total** | **roughly $130–185/mo**, dominated by the GPU nodes, Cloud NAT, and the always-on LB/VM |
 
 The single biggest lever if this needs to come down further: drop the GPU
 node pool to 0 nodes when not actively demoing it (interviews, portfolio

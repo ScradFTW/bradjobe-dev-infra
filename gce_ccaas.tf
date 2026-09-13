@@ -75,6 +75,30 @@ resource "google_compute_instance" "ccaas" {
     docker-credential-gcr configure-docker --registries=${var.region}-docker.pkg.dev 2>/dev/null || \
       gcloud auth configure-docker ${var.region}-docker.pkg.dev --quiet || true
 
+    # nginx is fully wired up here — not left as a manual post-boot step —
+    # so the LB health check (google_compute_health_check.ccaas below)
+    # passes even before the first Cloud Build deploy has run. ccaas.conf
+    # starts as a 503 stub; the first deploy (ccaas/infra/gcp-deploy.sh)
+    # overwrites it with the real proxy_pass to the backend.
+    # Written with printf, not nested heredocs: this whole script is
+    # itself the body of a Terraform <<-EOT heredoc, and mixing that
+    # dedent behavior with bash's own heredoc indentation rules is a
+    # well-known footgun that's easy to get subtly wrong and impossible
+    # to test without a real apply.
+    mkdir -p /etc/nginx/snippets
+    if [ ! -f /etc/nginx/snippets/ccaas.conf ]; then
+      printf 'location /ccaas/ {\n    return 503 "ccaas not deployed yet";\n}\n' \
+        > /etc/nginx/snippets/ccaas.conf
+    fi
+
+    printf 'map $http_upgrade $connection_upgrade {\n    default upgrade;\n    '"''"' close;\n}\n' \
+      > /etc/nginx/conf.d/upgrade-map.conf
+
+    printf 'server {\n    listen 80 default_server;\n    listen [::]:80 default_server;\n    server_name _;\n\n    include snippets/ccaas.conf;\n    include /etc/nginx/ccaas-sites/*.conf;\n\n    location / {\n        return 404;\n    }\n}\n' \
+      > /etc/nginx/sites-available/default
+    ln -sf /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default
+    nginx -t && systemctl reload nginx || systemctl restart nginx
+
     echo "base image ready — application deploy happens via Cloud Build (see ccaas/cloudbuild.yaml)"
   EOT
 }

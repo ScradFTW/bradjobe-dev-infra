@@ -58,14 +58,11 @@ resource "google_container_node_pool" "llm_gpu" {
       workload = "qwen-llm"
     }
 
-    # Spot nodes can be reclaimed at any time; keeping the taint means only
-    # workloads that explicitly tolerate it (the qwen-llm Deployment, see
-    # qwen-llm-gke/k8s/deployment.yaml) ever land here.
-    taint {
-      key    = "cloud.google.com/gke-spot"
-      value  = "true"
-      effect = "NO_SCHEDULE"
-    }
+    # No explicit taint block here: GKE automatically taints every node in
+    # a Spot node pool with cloud.google.com/gke-spot=true:NoSchedule.
+    # Declaring the same taint again in node_config fights that — the
+    # qwen-llm Deployment (qwen-llm-gke/k8s/deployment.yaml) just needs a
+    # matching toleration.
   }
 
   # Fixed size, no autoscaler: "at least two nodes" is a floor for the demo,

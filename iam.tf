@@ -56,6 +56,7 @@ resource "google_project_iam_member" "cloudbuild_app_deployer_roles" {
     "roles/container.developer",   # kubectl apply against bradjobe-llm-cluster
     "roles/compute.instanceAdmin.v1", # restart/query the ccaas VM
     "roles/iap.tunnelResourceAccessor", # SSH to the ccaas VM via IAP, no public port
+    "roles/compute.osAdminLogin",  # OS Login + sudo for that SSH session (rsync + systemctl restart)
     "roles/logging.logWriter",
   ])
   project = var.project_id

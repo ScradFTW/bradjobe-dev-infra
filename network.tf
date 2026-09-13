@@ -50,6 +50,30 @@ resource "google_compute_firewall" "allow_iap_ssh" {
   }
 }
 
+# The ccaas VM has no public IP (gce_ccaas.tf), but still needs real
+# internet egress: its startup script installs Docker/nginx from the
+# public internet, and dockerode pulls/runs images that themselves need
+# egress (gated per-user by the Squid egress-proxy container it manages —
+# that's a policy control at the container level, not a substitute for the
+# VM having a path out at all). GKE nodes route through the same NAT for
+# anything not reachable via Private Google Access.
+resource "google_compute_router" "main" {
+  name    = "bradjobe-router"
+  project = var.project_id
+  region  = var.region
+  network = google_compute_network.main.id
+}
+
+resource "google_compute_router_nat" "main" {
+  name    = "bradjobe-nat"
+  project = var.project_id
+  region  = var.region
+  router  = google_compute_router.main.name
+
+  nat_ip_allocate_option             = "AUTO_ONLY"
+  source_subnetwork_ip_ranges_to_nat = "ALL_SUBNETWORKS_ALL_IP_RANGES"
+}
+
 resource "google_compute_firewall" "allow_internal" {
   name    = "allow-internal"
   network = google_compute_network.main.id
