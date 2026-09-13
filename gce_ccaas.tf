@@ -76,6 +76,15 @@ resource "google_compute_instance" "ccaas" {
       systemctl enable --now docker
     fi
 
+    # The ccaas backend itself runs directly on the host (systemd + node),
+    # not containerized — only its sandbox/egress-proxy children are
+    # Docker images. Node 22 to match those images' base and the
+    # package.json engines expectation.
+    if ! command -v npm >/dev/null; then
+      curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+      apt-get install -y nodejs
+    fi
+
     useradd -r -m -d /srv/ccaas -s /usr/sbin/nologin ccaas 2>/dev/null || true
     usermod -aG docker ccaas
     mkdir -p /srv/ccaas/data /srv/ccaas/squid-acl /etc/nginx/ccaas-sites
