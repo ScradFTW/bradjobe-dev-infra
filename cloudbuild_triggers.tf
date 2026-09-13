@@ -74,10 +74,6 @@ resource "google_cloudbuild_trigger" "app" {
     _ARTIFACT_REGISTRY = "${var.region}-docker.pkg.dev/${var.project_id}/apps"
   }
 
-  options {
-    logging = "CLOUD_LOGGING_ONLY"
-  }
-
   depends_on = [google_project_iam_member.cloudbuild_app_deployer_roles]
 }
 
@@ -103,10 +99,6 @@ resource "google_cloudbuild_trigger" "terraform_plan_on_pr" {
     _TF_COMMAND = "plan"
   }
 
-  options {
-    logging = "CLOUD_LOGGING_ONLY"
-  }
-
   depends_on = [google_project_iam_member.terraform_infra_roles]
 }
 
@@ -126,10 +118,6 @@ resource "google_cloudbuild_trigger" "terraform_apply_on_main" {
 
   substitutions = {
     _TF_COMMAND = "apply -auto-approve"
-  }
-
-  options {
-    logging = "CLOUD_LOGGING_ONLY"
   }
 
   depends_on = [google_project_iam_member.terraform_infra_roles]
