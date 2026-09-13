@@ -52,12 +52,17 @@ resource "google_compute_instance" "ccaas" {
   # Manager (ccaas-deploy-ssh-private-key, created out of band, not by
   # Terraform, so it never touches state) and cloudbuild.yaml pulls it at
   # deploy time.
+  # startup-script lives in this plain metadata map, not the dedicated
+  # metadata_startup_script argument: that argument is ForceNew in this
+  # provider (any edit recreates the instance) and already collided once
+  # with create_before_destroy below — a same-zone/same-name replacement
+  # tries to create the replacement before destroying the original,
+  # which fails on a duplicate name. metadata is a plain updatable map,
+  # so edits here just update the running instance in place instead.
   metadata = {
     enable-oslogin = "FALSE"
     ssh-keys       = "clouddeploy:ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGcrkJTdSN/fZkOCAH0humHOgP+n1GbsCFOep91r1q+k clouddeploy"
-  }
-
-  metadata_startup_script = <<-EOT
+    startup-script = <<-EOT
     #!/usr/bin/env bash
     set -euo pipefail
 
@@ -122,13 +127,18 @@ resource "google_compute_instance" "ccaas" {
 
     echo "base image ready — application deploy happens via Cloud Build (see ccaas/cloudbuild.yaml)"
   EOT
-
-  # Matches google_compute_instance_group.ccaas below: Terraform requires
-  # this when a resource with create_before_destroy (the instance group)
-  # depends on one that doesn't, and is itself being replaced.
-  lifecycle {
-    create_before_destroy = true
   }
+
+  # No create_before_destroy here (on purpose, and it already burned once):
+  # this instance and google_compute_instance_group.ccaas below share the
+  # name "ccaas-vm"/"ccaas-vm-group" within the same zone, so create-first
+  # collides with the still-live original on a duplicate-name 409 unless
+  # they're also changing zone. The original create_before_destroy was
+  # added for exactly that cross-zone case (the northamerica-northeast1-a
+  # -> -c move) and isn't needed now that both are settled in -c — a
+  # same-zone replacement destroys the old one first, freeing the name,
+  # with no conflict since the instance group's `instances` list update
+  # doesn't require the old instance to still exist.
 }
 
 # Unmanaged instance group so this single VM can be an External HTTPS LB
