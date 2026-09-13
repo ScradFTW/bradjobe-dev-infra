@@ -1,14 +1,28 @@
 # The connection itself (GitHub App installation + its OAuth token secret)
-# is created by the Cloud Console's "Connect Repository" flow during
-# bootstrap, not by Terraform — that flow's GitHub OAuth consent step is
-# inherently interactive and can't be scripted. This is a data source, not
-# a resource, precisely because Terraform doesn't own its lifecycle; it
-# only needs to reference it to attach repositories. See README.md
-# "Bootstrap".
-data "google_cloudbuildv2_connection" "github" {
+# was created by the Cloud Build console's "Connect Repository" flow
+# during bootstrap, not by this resource block — that flow's GitHub OAuth
+# consent step is inherently interactive and can't be scripted. (There is
+# no data source for this resource type in the google provider, only
+# `resource` — so importing it, with config matching its actual live
+# values, is the only way to reference it from Terraform at all.) The
+# import block below adopts it; Terraform owns its lifecycle from here on
+# the same as anything else in this repo, it just didn't create it.
+resource "google_cloudbuildv2_connection" "github" {
   project  = var.project_id
   location = var.region
   name     = "scradftw-github"
+
+  github_config {
+    app_installation_id = "161463108"
+    authorizer_credential {
+      oauth_token_secret_version = "projects/${var.project_id}/secrets/scradftw-github-github-oauthtoken-3446ca/versions/latest"
+    }
+  }
+}
+
+import {
+  to = google_cloudbuildv2_connection.github
+  id = "projects/${var.project_id}/locations/${var.region}/connections/scradftw-github"
 }
 
 resource "google_cloudbuildv2_repository" "apps" {
@@ -17,7 +31,7 @@ resource "google_cloudbuildv2_repository" "apps" {
   project           = var.project_id
   location          = var.region
   name              = each.value
-  parent_connection = data.google_cloudbuildv2_connection.github.name
+  parent_connection = google_cloudbuildv2_connection.github.name
   remote_uri        = "https://github.com/${var.github_owner}/${each.value}.git"
 }
 
@@ -28,7 +42,7 @@ resource "google_cloudbuildv2_repository" "infra" {
   project           = var.project_id
   location          = var.region
   name              = "bradjobe-dev-infra"
-  parent_connection = data.google_cloudbuildv2_connection.github.name
+  parent_connection = google_cloudbuildv2_connection.github.name
   remote_uri        = "https://github.com/${var.github_owner}/bradjobe-dev-infra.git"
 }
 

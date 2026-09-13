@@ -131,9 +131,11 @@ setup that the self-hosted pipeline then takes over from.
    creates the `google_cloudbuildv2_connection` itself (named
    `scradftw-github`) *and* a Secret Manager secret holding its GitHub
    token, already granted to Cloud Build's service agent. `cloudbuild.tf`
-   deliberately has no `resource` for either — only a `data
-   "google_cloudbuildv2_connection"` reading `scradftw-github` by name.
-   Terraform never owns this connection's lifecycle.
+   has a matching `import` block for `google_cloudbuildv2_connection.github`
+   (the google provider has no data source for this resource type, only
+   `resource` — importing it, with config matching its real values, is
+   the only way to reference it from Terraform) — so Terraform adopts and
+   manages it going forward, it just didn't create it.
 
 4. **Register this repo with that connection**, and tell Terraform about
    the resource that creates so its first apply doesn't try to create a
