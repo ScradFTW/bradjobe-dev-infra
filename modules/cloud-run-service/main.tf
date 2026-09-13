@@ -39,6 +39,12 @@ resource "google_cloud_run_v2_service" "this" {
           cpu    = var.cpu
           memory = var.memory
         }
+        # CPU only allocated while handling a request, not for the life of
+        # the instance — the right default for these low-traffic services
+        # (cheaper: idle instances aren't billed for CPU) and required by
+        # Cloud Run below 512Mi: "always allocated" CPU rejects memory
+        # under 512Mi outright.
+        cpu_idle = true
       }
 
       dynamic "env" {
