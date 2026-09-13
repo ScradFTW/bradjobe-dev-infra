@@ -8,6 +8,11 @@ resource "google_secret_manager_secret" "ccaas" {
     "ccaas-google-oauth-client-secret",
     "ccaas-session-secret",
     "ccaas-allowed-emails",
+    # Production never actually configured Google OAuth (the two above
+    # are empty there too) — real auth is ADMIN_USERNAME/ADMIN_PASSWORD.
+    # Username isn't secret (hardcoded "admin" in gcp-deploy.sh); only
+    # the password needs to live here.
+    "ccaas-admin-password",
   ])
 
   project   = var.project_id
@@ -18,6 +23,16 @@ resource "google_secret_manager_secret" "ccaas" {
   }
 
   depends_on = [google_project_service.apis]
+}
+
+# Created out of band before this resource existed in code (populated
+# with a freshly-generated password immediately after discovering the
+# old VPS's admin password had been accidentally exposed in a debugging
+# session — rotated rather than reused). Adopted via import, same
+# pattern as the other bootstrap-created secrets in this file.
+import {
+  to = google_secret_manager_secret.ccaas["ccaas-admin-password"]
+  id = "projects/${var.project_id}/secrets/ccaas-admin-password"
 }
 
 resource "google_secret_manager_secret_iam_member" "ccaas_vm_can_read" {
