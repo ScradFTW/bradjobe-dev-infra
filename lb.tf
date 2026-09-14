@@ -122,25 +122,28 @@ resource "google_compute_url_map" "main" {
     }
 
     # --- single-purpose static apps ---
-    route_rules {
-      priority = 10
-      match_rules {
-        prefix_match = "/ai/"
-      }
-      service = module.ai_hub.backend_service_id
-    }
     # pose-tracker's large binary assets (onnxruntime-web's WASM runtime,
     # the ~61MB trained model) go to a GCS backend bucket instead of the
     # Cloud Run container — Cloud Run enforces a 32MB response size limit,
     # confirmed for real (nginx served the file fine; Cloud Run's own
-    # proxy cut it short). Must come before priority 11's general
-    # /pose-tracker/ rule below, which would otherwise shadow it.
+    # proxy cut it short). Priority (and declaration order — GCP requires
+    # both to agree; a priority=9 rule declared AFTER a priority=10 rule
+    # was rejected outright, confirmed for real) must put this ahead of
+    # priority 11's general /pose-tracker/ rule below, which would
+    # otherwise shadow it.
     route_rules {
       priority = 9
       match_rules {
         prefix_match = "/pose-tracker/vendor/"
       }
       service = google_compute_backend_bucket.pose_tracker_vendor.id
+    }
+    route_rules {
+      priority = 10
+      match_rules {
+        prefix_match = "/ai/"
+      }
+      service = module.ai_hub.backend_service_id
     }
 
     # No route_action here: prefix_match + path_prefix_rewrite doesn't
