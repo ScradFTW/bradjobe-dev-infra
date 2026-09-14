@@ -105,7 +105,14 @@ variable "llm_cpu_node_count" {
 }
 
 variable "llm_cpu_machine_type" {
-  description = "Cheap, no-GPU machine type for the temporary CPU fallback pool — needs no GPU quota at all."
+  description = <<-EOT
+    Cheap, no-GPU machine type for the temporary CPU fallback pool —
+    needs no GPU quota at all. e2-small (2 vCPU/2GB nominal) was tried
+    first and failed real scheduling ("Insufficient cpu" on all 4 nodes):
+    GKE's per-node system DaemonSets + kube-reserved overhead eat enough
+    of a 2GB node that there wasn't room left for even one pod's 1 vCPU/
+    512Mi request. e2-medium has enough headroom above that overhead.
+  EOT
   type        = string
-  default     = "e2-small"
+  default     = "e2-medium"
 }
