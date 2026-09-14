@@ -34,12 +34,25 @@ resource "google_compute_url_map" "main" {
 
     # --- most specific: API subpaths (checked ahead of the SPA prefixes
     # below since a request can only match one route_rule) ---
+    # path_prefix_rewrite = "/" on all three: the original nginx config
+    # stripped these prefixes automatically (`location /x/api/ {
+    # proxy_pass http://...:PORT/; }` — a proxy_pass URI ending in "/"
+    # strips the matched location prefix). Each Flask app only defines
+    # routes like /predict, /health, /stats with no prefix at all, so
+    # without this rewrite every one of these 404s against the real
+    # backend — confirmed for real, not just inferred, once the load
+    # balancer was actually live and testable.
     route_rules {
       priority = 1
       match_rules {
         prefix_match = "/genre-classifier/api/"
       }
       service = module.genre_classifier.backend_service_id
+      route_action {
+        url_rewrite {
+          path_prefix_rewrite = "/"
+        }
+      }
     }
     route_rules {
       priority = 2
@@ -47,6 +60,11 @@ resource "google_compute_url_map" "main" {
         prefix_match = "/image-classifier/api/"
       }
       service = module.image_classifier.backend_service_id
+      route_action {
+        url_rewrite {
+          path_prefix_rewrite = "/"
+        }
+      }
     }
     route_rules {
       priority = 3
@@ -54,6 +72,11 @@ resource "google_compute_url_map" "main" {
         prefix_match = "/agent-demo/api/"
       }
       service = module.agent_orchestrator.backend_service_id
+      route_action {
+        url_rewrite {
+          path_prefix_rewrite = "/"
+        }
+      }
     }
 
     # /status/api/* fans out to three backends' own /stats endpoint —
@@ -109,6 +132,18 @@ resource "google_compute_url_map" "main" {
         prefix_match = "/pose-tracker/"
       }
       service = module.pose_tracker.backend_service_id
+      # The container serves its files at its own root (Dockerfile: COPY
+      # frontend/pose-tracker/ /usr/share/nginx/html/), matching the
+      # original nginx `alias` directive's automatic prefix-stripping —
+      # without this rewrite, /pose-tracker/index.html reaches the
+      # container unchanged and 404s looking for html/pose-tracker/index.html.
+      # Confirmed for real: this is exactly the bug that surfaced once
+      # the LB was actually live and testable.
+      route_action {
+        url_rewrite {
+          path_prefix_rewrite = "/"
+        }
+      }
     }
 
     # --- ccaas: whole subtree (frontend, API, and the /ws/chat upgrade
