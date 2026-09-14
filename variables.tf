@@ -107,12 +107,22 @@ variable "llm_cpu_node_count" {
 variable "llm_cpu_machine_type" {
   description = <<-EOT
     Cheap, no-GPU machine type for the temporary CPU fallback pool —
-    needs no GPU quota at all. e2-small (2 vCPU/2GB nominal) was tried
-    first and failed real scheduling ("Insufficient cpu" on all 4 nodes):
-    GKE's per-node system DaemonSets + kube-reserved overhead eat enough
-    of a 2GB node that there wasn't room left for even one pod's 1 vCPU/
-    512Mi request. e2-medium has enough headroom above that overhead.
+    needs no GPU quota at all.
+
+    Two prior attempts failed real scheduling with "Insufficient cpu":
+    e2-small first, then e2-medium. Root cause confirmed via
+    `kubectl describe node`: e2-medium is a shared-core machine type, and
+    GKE reports its allocatable CPU as the shared-core *baseline*
+    (940m — nowhere near the 2-vCPU burst ceiling the machine name
+    implies). After per-node system DaemonSet overhead, real headroom
+    was only ~100-370m depending on the node — not enough for even one
+    pod's 550m request anywhere.
+
+    e2-standard-2 is the smallest *non*-shared-core e2 tier — its
+    allocatable reflects close to the full 2 vCPUs, giving genuine
+    headroom above system overhead instead of fighting a burstable
+    baseline.
   EOT
   type        = string
-  default     = "e2-medium"
+  default     = "e2-standard-2"
 }
