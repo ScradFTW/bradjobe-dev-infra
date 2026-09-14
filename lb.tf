@@ -34,47 +34,50 @@ resource "google_compute_url_map" "main" {
 
     # --- most specific: API subpaths (checked ahead of the SPA prefixes
     # below since a request can only match one route_rule) ---
-    # path_prefix_rewrite = "/" on all three: the original nginx config
-    # stripped these prefixes automatically (`location /x/api/ {
-    # proxy_pass http://...:PORT/; }` — a proxy_pass URI ending in "/"
-    # strips the matched location prefix). Each Flask app only defines
-    # routes like /predict, /health, /stats with no prefix at all, so
-    # without this rewrite every one of these 404s against the real
-    # backend — confirmed for real, not just inferred, once the load
-    # balancer was actually live and testable.
+    # full_path_match + path_prefix_rewrite, not prefix_match: tried
+    # prefix_match first (matching the original nginx's blanket prefix
+    # strip), and confirmed for real — via the actual Cloud Run request
+    # logs, which showed the backend receiving the UNREWRITTEN path —
+    # that combination silently doesn't rewrite anything for a Serverless
+    # NEG backend. full_path_match does (already proven by the
+    # /status/api/* rules below, which use exactly this combination).
+    # Each frontend tab only ever calls one specific endpoint (checked
+    # demos-ui's tab components directly), so an explicit rule per
+    # endpoint is no less correct than a blanket prefix strip would have
+    # been, just less flexible for hypothetical endpoints nothing calls.
     route_rules {
       priority = 1
       match_rules {
-        prefix_match = "/genre-classifier/api/"
+        full_path_match = "/genre-classifier/api/predict"
       }
       service = module.genre_classifier.backend_service_id
       route_action {
         url_rewrite {
-          path_prefix_rewrite = "/"
+          path_prefix_rewrite = "/predict"
         }
       }
     }
     route_rules {
       priority = 2
       match_rules {
-        prefix_match = "/image-classifier/api/"
+        full_path_match = "/image-classifier/api/predict"
       }
       service = module.image_classifier.backend_service_id
       route_action {
         url_rewrite {
-          path_prefix_rewrite = "/"
+          path_prefix_rewrite = "/predict"
         }
       }
     }
     route_rules {
       priority = 3
       match_rules {
-        prefix_match = "/agent-demo/api/"
+        full_path_match = "/agent-demo/api/chat"
       }
       service = module.agent_orchestrator.backend_service_id
       route_action {
         url_rewrite {
-          path_prefix_rewrite = "/"
+          path_prefix_rewrite = "/chat"
         }
       }
     }
@@ -126,24 +129,21 @@ resource "google_compute_url_map" "main" {
       }
       service = module.ai_hub.backend_service_id
     }
+    # No route_action here: prefix_match + path_prefix_rewrite doesn't
+    # actually rewrite anything for a Serverless NEG backend (confirmed
+    # for real via Cloud Run's own request logs — see the API rules
+    # above, which hit the exact same thing and switched to
+    # full_path_match instead). Pose-tracker serves many files, not one
+    # endpoint, so full_path_match per file isn't practical either — the
+    # container itself now serves everything under /pose-tracker/
+    # (Dockerfile in that repo), matching ai-hub/ai-tools' already-proven
+    # approach of physically mirroring the URL prefix inside the image.
     route_rules {
       priority = 11
       match_rules {
         prefix_match = "/pose-tracker/"
       }
       service = module.pose_tracker.backend_service_id
-      # The container serves its files at its own root (Dockerfile: COPY
-      # frontend/pose-tracker/ /usr/share/nginx/html/), matching the
-      # original nginx `alias` directive's automatic prefix-stripping —
-      # without this rewrite, /pose-tracker/index.html reaches the
-      # container unchanged and 404s looking for html/pose-tracker/index.html.
-      # Confirmed for real: this is exactly the bug that surfaced once
-      # the LB was actually live and testable.
-      route_action {
-        url_rewrite {
-          path_prefix_rewrite = "/"
-        }
-      }
     }
 
     # --- ccaas: whole subtree (frontend, API, and the /ws/chat upgrade
