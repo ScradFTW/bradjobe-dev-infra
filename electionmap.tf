@@ -37,8 +37,8 @@ resource "google_sql_database_instance" "electionmap" {
     # Public IP, but not publicly reachable: with no authorized_networks,
     # the only way in is the Cloud SQL connector (IAM cloudsql.client + TLS).
     # Private IP would need VPC peering plus VPC egress on the Cloud Run
-    # service, and would stop the migration runbook's cloud-sql-proxy from
-    # working off-network — not worth it for one small public dataset.
+    # service, and admin access through cloud-sql-proxy (README) would then
+    # need a VPC path too. Not worth it for one small public dataset.
     ip_configuration {
       ipv4_enabled = true
       ssl_mode     = "ENCRYPTED_ONLY"

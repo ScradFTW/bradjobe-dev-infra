@@ -309,19 +309,12 @@ Build repository resource that points at the GitHub repo:
 4. **Deploy the app**: push to `canelect`'s `main`, or run
    `gcloud builds triggers run electionmap-deploy-on-main --region=northamerica-northeast1 --branch=main`.
 
-**Migrating the old site's maps (optional).** The old sign-in version kept
-maps in a `users` table keyed by Firebase UID. Copy that one table in
-(read-only against the old database), convert it with the app repo's
-`scripts/migrate-to-anonymous-maps.sql`, then drop the UIDs. The new
-database's credentials come from the secret Terraform wrote:
+**Connecting to the database** (admin or debugging), from a machine with
+`gcloud` access. The credentials come from the secret Terraform wrote:
 ```sh
-pg_dump "$OLD_DATABASE_URL" --table=users --no-owner --no-privileges > users.sql
 cloud-sql-proxy bradjobe-dev:northamerica-northeast1:electionmap-db --port 5433 &
-NEW=$(gcloud secrets versions access latest --secret=electionmap-database-url \
-  | sed -E 's#@localhost/([^?]*).*#@127.0.0.1:5433/\1#')
-psql "$NEW" -f users.sql
-psql "$NEW" -f scripts/migrate-to-anonymous-maps.sql
-psql "$NEW" -c 'DROP TABLE users;'
+psql "$(gcloud secrets versions access latest --secret=electionmap-database-url \
+  | sed -E 's#@localhost/([^?]*).*#@127.0.0.1:5433/\1#')"
 ```
 
 ## Rollback
