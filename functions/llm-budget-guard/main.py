@@ -20,6 +20,10 @@ PROJECT_ID = os.environ["PROJECT_ID"]
 CLUSTER_LOCATION = os.environ["CLUSTER_LOCATION"]
 CLUSTER_NAME = os.environ["CLUSTER_NAME"]
 
+# Python's root logger defaults to WARNING, which would drop the INFO line
+# that shows each routine under-budget check.
+logging.getLogger().setLevel(logging.INFO)
+
 
 def over_budget(notification: dict) -> bool:
     return notification["costAmount"] >= notification["budgetAmount"]
