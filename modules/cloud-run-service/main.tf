@@ -124,6 +124,10 @@ resource "google_cloud_run_v2_service" "this" {
       # spurious diff.
       client,
       client_version,
+      # Service-level scaling (not template.scaling, which this module sets).
+      # Unset here, but the API reports it back as zeros, so every plan
+      # showed an in-place "update" removing them from every service.
+      scaling,
     ]
   }
 }
