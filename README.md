@@ -177,6 +177,21 @@ setup that the self-hosted pipeline then takes over from.
    `terraform output name_servers` (visible in the Cloud Build log, or
    `gcloud dns managed-zones describe bradjobe-dev-zone`) gives you the 4
    nameservers to set at your registrar. See "Cutover" below for timing.
+   Then **verify the registrant email** Namecheap sends: if it isn't
+   verified within 15 days, Namecheap suspends the domain by swapping its
+   nameservers at the registry for `failed-whois-verification.namecheap.com`.
+   The Namecheap dashboard keeps showing the Cloud DNS nameservers while
+   that happens, so the outage looks like a DNS problem.
+
+8. **Let `terraform-infra` manage the LLM cluster's budget.** Budgets live
+   on the billing account, not the project, so the project-level roles in
+   step 2 don't cover them and Terraform can't grant this to itself. A
+   billing account admin runs this once:
+   ```sh
+   gcloud billing accounts add-iam-policy-binding 01BB9E-1216C2-6D366A \
+     --member="serviceAccount:terraform-infra@bradjobe-dev.iam.gserviceaccount.com" \
+     --role="roles/billing.costsManager"
+   ```
 
 ## Cutover
 
@@ -239,6 +254,18 @@ node pool to 0 nodes when not actively demoing it (interviews, portfolio
 reviews) and scale back to 2 with `gcloud container clusters resize` —
 Terraform's `llm_gpu_node_count` var reflects the steady-state you want
 long-term, not a knob for day-to-day toggling.
+
+### LLM cluster spending cap
+
+`llm_budget_guard.tf` caps `bradjobe-llm-cluster` at `llm_monthly_budget`
+(default $100 CAD/month, gross of credits). Billing admins get emails at
+50%, 90% and 100%. At 100%, a Cloud Function scales every node pool to 0,
+which takes llm.bradjobe.dev offline until the pools are resized. Billing
+data lags a few hours, so the actual shutdown lands a few hours after the
+cap is crossed. The function re-applies on every budget update for the
+rest of the month, so to restore early, raise `llm_monthly_budget` first
+and then resize the pools (commands at the top of that file). Otherwise it
+comes back with the next `terraform apply` after the month rolls over.
 
 ## Rollback
 

@@ -118,6 +118,9 @@ resource "google_project_iam_member" "terraform_infra_roles" {
     "roles/cloudbuild.builds.editor",
     "roles/cloudbuild.connectionAdmin",
     "roles/logging.logWriter",
+    "roles/pubsub.admin",         # llm_budget_guard.tf
+    "roles/cloudfunctions.admin", # llm_budget_guard.tf
+    "roles/eventarc.admin",       # llm_budget_guard.tf
   ])
   project = var.project_id
   role    = each.value
