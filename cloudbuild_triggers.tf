@@ -48,6 +48,11 @@ locals {
       filename       = "cloudbuild.yaml"
       included_files = null
     }
+    electionmap = {
+      repo_key       = "canelect"
+      filename       = "cloudbuild.yaml"
+      included_files = null
+    }
   }
 }
 

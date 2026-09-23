@@ -17,6 +17,24 @@ variable "env" {
   default     = {}
 }
 
+variable "secret_env" {
+  description = "Environment variables sourced from Secret Manager, as { ENV_NAME = secret_id }. Always reads the latest version; the module grants the runtime service account access to each secret."
+  type        = map(string)
+  default     = {}
+}
+
+variable "cloudsql_instances" {
+  description = "Cloud SQL instance connection names to expose as unix sockets under /cloudsql/<connection-name>."
+  type        = list(string)
+  default     = []
+}
+
+variable "project_roles" {
+  description = "Extra project-level roles for the runtime service account (e.g. roles/cloudsql.client). Granted before the service is created."
+  type        = set(string)
+  default     = []
+}
+
 variable "cpu" {
   type    = string
   default = "1"

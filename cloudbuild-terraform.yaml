@@ -5,14 +5,14 @@
 # is ever allowed to run; there is deliberately no local/laptop path.
 steps:
   - id: init
-    name: "hashicorp/terraform:1.9"
+    name: "hashicorp/terraform:1.16"
     entrypoint: sh
     args:
       - -c
       - terraform init -input=false
 
   - id: tf-command
-    name: "hashicorp/terraform:1.9"
+    name: "hashicorp/terraform:1.16"
     entrypoint: sh
     args:
       - -c

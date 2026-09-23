@@ -19,6 +19,7 @@ locals {
     "pubsub.googleapis.com",
     "cloudfunctions.googleapis.com",
     "eventarc.googleapis.com",
+    "sqladmin.googleapis.com",
   ]
 }
 
