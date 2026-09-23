@@ -15,6 +15,10 @@ locals {
     "storage.googleapis.com",
     "serviceusage.googleapis.com",
     "sts.googleapis.com",
+    "billingbudgets.googleapis.com",
+    "pubsub.googleapis.com",
+    "cloudfunctions.googleapis.com",
+    "eventarc.googleapis.com",
   ]
 }
 

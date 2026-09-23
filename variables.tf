@@ -47,6 +47,18 @@ variable "app_repos" {
   ]
 }
 
+variable "billing_account_id" {
+  description = "Billing account bradjobe-dev is linked to. Only used by the LLM cluster's budget (llm_budget_guard.tf)."
+  type        = string
+  default     = "01BB9E-1216C2-6D366A"
+}
+
+variable "llm_monthly_budget" {
+  description = "Monthly spend cap for bradjobe-llm-cluster, in the billing account's currency (CAD). When reached, llm_budget_guard.tf's function scales every node pool to 0. Raise this before resizing the pools back up mid-month, or the next budget update re-zeroes them."
+  type        = number
+  default     = 100
+}
+
 variable "ccaas_machine_type" {
   description = "Machine type for the ccaas GCE VM (needs a real Docker daemon; not Cloud-Run-able)."
   type        = string
