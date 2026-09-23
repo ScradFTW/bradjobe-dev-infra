@@ -28,6 +28,18 @@ variable "llm_subdomain" {
   default     = "llm.bradjobe.dev"
 }
 
+variable "electionmap_subdomain" {
+  description = "Hostname the Election Map app (repo: canelect) is served on, through the main load balancer."
+  type        = string
+  default     = "electionmap.bradjobe.dev"
+}
+
+variable "electionmap_db_tier" {
+  description = "Cloud SQL tier for Election Map's Postgres. db-f1-micro (shared core, ~25 max connections) is plenty for one table of small maps; the app caps each instance's pool at 5 connections to fit."
+  type        = string
+  default     = "db-f1-micro"
+}
+
 variable "github_owner" {
   description = "GitHub org/user that owns every app repo this connects to."
   type        = string
@@ -44,6 +56,7 @@ variable "app_repos" {
     "pose-tracker",
     "ccaas",
     "qwen-llm-gke",
+    "canelect",
   ]
 }
 

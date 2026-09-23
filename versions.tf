@@ -1,5 +1,5 @@
 terraform {
-  required_version = ">= 1.9.0"
+  required_version = ">= 1.11.0" # write-only attributes (electionmap.tf)
 
   required_providers {
     google = {
@@ -13,6 +13,10 @@ terraform {
     archive = {
       source  = "hashicorp/archive"
       version = "~> 2.7"
+    }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.7"
     }
   }
 

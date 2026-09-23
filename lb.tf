@@ -294,13 +294,30 @@ resource "google_compute_url_map" "main" {
       }
     }
   }
+
+  # Election Map is a whole Next.js app on its own hostname — no path
+  # routing, every request goes to its one backend (electionmap.tf).
+  # Declared after "main" on purpose: path_matcher is an ordered list, and
+  # inserting ahead of it makes the plan diff every existing route.
+  host_rule {
+    hosts        = [var.electionmap_subdomain]
+    path_matcher = "electionmap"
+  }
+
+  path_matcher {
+    name            = "electionmap"
+    default_service = module.electionmap.backend_service_id
+  }
 }
 
 resource "google_compute_target_https_proxy" "main" {
-  name             = "bradjobe-https-proxy"
-  project          = var.project_id
-  url_map          = google_compute_url_map.main.id
-  ssl_certificates = [google_compute_managed_ssl_certificate.main.id]
+  name    = "bradjobe-https-proxy"
+  project = var.project_id
+  url_map = google_compute_url_map.main.id
+  ssl_certificates = [
+    google_compute_managed_ssl_certificate.main.id,
+    google_compute_managed_ssl_certificate.electionmap.id,
+  ]
 }
 
 resource "google_compute_global_forwarding_rule" "https" {

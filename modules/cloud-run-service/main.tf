@@ -7,6 +7,23 @@ resource "google_service_account" "runtime" {
   display_name = "Runtime identity for Cloud Run service ${var.name}"
 }
 
+# Granted before the service exists: a revision that can't read its secrets
+# fails to start, which would fail the apply.
+resource "google_secret_manager_secret_iam_member" "runtime_reads_secret" {
+  for_each  = var.secret_env
+  project   = var.project_id
+  secret_id = each.value
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.runtime.email}"
+}
+
+resource "google_project_iam_member" "runtime_roles" {
+  for_each = var.project_roles
+  project  = var.project_id
+  role     = each.value
+  member   = "serviceAccount:${google_service_account.runtime.email}"
+}
+
 # Terraform owns the service's existence, scaling, and IAM. It deliberately
 # does NOT own the deployed image: Cloud Build deploys new revisions on every
 # push to main (see the app repo's cloudbuild.yaml), and re-running
@@ -54,8 +71,44 @@ resource "google_cloud_run_v2_service" "this" {
           value = env.value
         }
       }
+
+      dynamic "env" {
+        for_each = var.secret_env
+        content {
+          name = env.key
+          value_source {
+            secret_key_ref {
+              secret  = env.value
+              version = "latest"
+            }
+          }
+        }
+      }
+
+      dynamic "volume_mounts" {
+        for_each = length(var.cloudsql_instances) > 0 ? [1] : []
+        content {
+          name       = "cloudsql"
+          mount_path = "/cloudsql"
+        }
+      }
+    }
+
+    dynamic "volumes" {
+      for_each = length(var.cloudsql_instances) > 0 ? [1] : []
+      content {
+        name = "cloudsql"
+        cloud_sql_instance {
+          instances = var.cloudsql_instances
+        }
+      }
     }
   }
+
+  depends_on = [
+    google_secret_manager_secret_iam_member.runtime_reads_secret,
+    google_project_iam_member.runtime_roles,
+  ]
 
   lifecycle {
     ignore_changes = [
@@ -71,6 +124,10 @@ resource "google_cloud_run_v2_service" "this" {
       # spurious diff.
       client,
       client_version,
+      # Service-level scaling (not template.scaling, which this module sets).
+      # Unset here, but the API reports it back as zeros, so every plan
+      # showed an in-place "update" removing them from every service.
+      scaling,
     ]
   }
 }

@@ -35,5 +35,11 @@ output "cloud_run_urls" {
     genre-classifier   = module.genre_classifier.service_uri
     image-classifier   = module.image_classifier.service_uri
     agent-orchestrator = module.agent_orchestrator.service_uri
+    electionmap        = module.electionmap.service_uri
   }
+}
+
+output "electionmap_db_connection_name" {
+  description = "Cloud SQL connection name for Election Map's DATABASE_URL (host=/cloudsql/<this>) and for cloud-sql-proxy."
+  value       = google_sql_database_instance.electionmap.connection_name
 }

@@ -76,6 +76,7 @@ resource "google_service_account_iam_member" "cloudbuild_can_act_as_runtime_sa" 
     genre-classifier    = module.genre_classifier.runtime_service_account_email
     image-classifier    = module.image_classifier.runtime_service_account_email
     agent-orchestrator  = module.agent_orchestrator.runtime_service_account_email
+    electionmap         = module.electionmap.runtime_service_account_email
   }
   service_account_id = "projects/${var.project_id}/serviceAccounts/${each.value}"
   role                = "roles/iam.serviceAccountUser"
@@ -121,6 +122,7 @@ resource "google_project_iam_member" "terraform_infra_roles" {
     "roles/pubsub.admin",         # llm_budget_guard.tf
     "roles/cloudfunctions.admin", # llm_budget_guard.tf
     "roles/eventarc.admin",       # llm_budget_guard.tf
+    "roles/cloudsql.admin",       # electionmap.tf
   ])
   project = var.project_id
   role    = each.value

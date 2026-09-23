@@ -55,6 +55,10 @@ Path routing on the main LB (`lb.tf`, `google_compute_url_map.main`):
 `llm.bradjobe.dev` (its own GKE Ingress, **not** part of the LB above) →
 the `qwen-llm` Service in `bradjobe-llm-cluster`.
 
+`electionmap.bradjobe.dev` is a second host rule on the same LB, with its
+own managed cert: every path goes to Cloud Run `electionmap`, which talks to
+the Cloud SQL Postgres instance `electionmap-db` (`electionmap.tf`).
+
 ## What's deliberately NOT in this repo
 
 The nginx-layer interactions-tracking plugin (`/var/www/interactions`,
@@ -77,6 +81,7 @@ deploys on push to `main`:
 - `pose-tracker` → Cloud Run `pose-tracker`
 - `ccaas` → `ccaas-vm` (builds 3 images: backend, sandbox, egress-proxy; redeploys over an IAP SSH tunnel)
 - `qwen-llm-gke` (new repo) → `bradjobe-llm-cluster` (`kubectl apply`)
+- `canelect` → Cloud Run `electionmap` (see "Election Map" below)
 
 ## Bootstrap (one-time, manual — run once, in order)
 
@@ -121,10 +126,10 @@ setup that the self-hosted pipeline then takes over from.
 
 3. **Install the Cloud Build GitHub App** on the `ScradFTW` account:
    Cloud Console → Cloud Build → Repositories (2nd gen) → "Create Host
-   Connection" → GitHub → authorize the app, grant it access to all 7
+   Connection" → GitHub → authorize the app, grant it access to all 8
    repos this project touches (`bradjobe.dev`, `demos-ui`,
    `llm-testing-deploy`, `pose-tracker`, `ccaas`, `qwen-llm-gke`,
-   `bradjobe-dev-infra`). This step is inherently interactive (GitHub
+   `canelect`, `bradjobe-dev-infra`). This step is inherently interactive (GitHub
    OAuth consent) and can't be scripted.
 
    This single step does more than it looks like: the console flow
@@ -219,6 +224,10 @@ TTL you control beforehand):
 
 ## Secrets
 
+The one exception is `electionmap-database-url`: Terraform generates and
+writes that one itself, through a write-only argument that keeps the value
+out of state (see "Election Map").
+
 Terraform creates empty Secret Manager secrets for ccaas
 (`secrets.tf`) — it never writes values into them. Populate them once,
 out of band:
@@ -242,12 +251,13 @@ the SSH redeploy step), not Terraform's.
 | GKE cluster management fee | $0 (first zonal cluster/billing account is free) |
 | 2x Spot `n1-standard-2` + T4 | ~$60–90 (Spot T4 pricing varies; on-demand equivalent is ~3x this) |
 | `ccaas-vm` (e2-medium, always-on) | ~$25 |
-| Cloud Run (7 services, scale-to-zero, low traffic) | ~$0–10 |
+| Cloud Run (8 services, scale-to-zero, low traffic) | ~$0–10 |
+| Cloud SQL `electionmap-db` (db-f1-micro, 10GB SSD, backups) | ~$10–13 |
 | Global external HTTPS LB (forwarding rules + data processed) | ~$18+ |
 | Cloud NAT (ccaas-vm's + GKE nodes' internet egress) | ~$32 gateway + ~$0.045/GB processed |
 | Cloud DNS zone | ~$0.20 + queries |
 | Artifact Registry storage | ~$1–2 |
-| **Total** | **roughly $130–185/mo**, dominated by the GPU nodes, Cloud NAT, and the always-on LB/VM |
+| **Total** | **roughly $140–200/mo**, dominated by the GPU nodes, Cloud NAT, and the always-on LB/VM |
 
 The single biggest lever if this needs to come down further: drop the GPU
 node pool to 0 nodes when not actively demoing it (interviews, portfolio
@@ -266,6 +276,46 @@ cap is crossed. The function re-applies on every budget update for the
 rest of the month, so to restore early, raise `llm_monthly_budget` first
 and then resize the pools (commands at the top of that file). Otherwise it
 comes back with the next `terraform apply` after the month rolls over.
+
+## Election Map
+
+`electionmap.tf` runs the `canelect` repo (anonymous Canadian election
+prediction maps, Next.js) at `https://electionmap.bradjobe.dev`. Unlike
+the other Cloud Run services it has a database: Cloud SQL Postgres
+`electionmap-db`, reached over the Cloud SQL connector's unix socket, with
+`DATABASE_URL` injected from Secret Manager.
+
+Terraform creates everything, including the app's database user. It
+generates the password itself and passes it to Cloud SQL and to the
+`electionmap-database-url` secret through write-only arguments
+(`password_wo`, `secret_data_wo`), so the password never appears in state
+or plan output. That's also why this repo needs Terraform 1.11 or newer
+(`versions.tf`; the pipeline runs 1.16). To rotate it, bump
+`local.electionmap_db_password_version` in `electionmap.tf` and merge.
+
+Ordering matters the first time, since `terraform apply` creates a Cloud
+Build repository resource that points at the GitHub repo:
+
+1. **Create `ScradFTW/canelect` on GitHub and push the app.**
+2. **Grant the Cloud Build GitHub App access to it**: GitHub → Settings →
+   Applications → Google Cloud Build → Configure → Repository access → add
+   `canelect`.
+3. **Merge this repo's change.** The apply creates the Cloud SQL instance
+   (allow ~10 minutes), the database and user, the `DATABASE_URL` secret,
+   the service (running the `hello` placeholder), the cert, the DNS record
+   and the `electionmap-deploy-on-main` trigger. The managed cert
+   provisions on its own once Google sees the DNS record, usually within
+   an hour. The app creates its `maps` table on first use.
+4. **Deploy the app**: push to `canelect`'s `main`, or run
+   `gcloud builds triggers run electionmap-deploy-on-main --region=northamerica-northeast1 --branch=main`.
+
+**Connecting to the database** (admin or debugging), from a machine with
+`gcloud` access. The credentials come from the secret Terraform wrote:
+```sh
+cloud-sql-proxy bradjobe-dev:northamerica-northeast1:electionmap-db --port 5433 &
+psql "$(gcloud secrets versions access latest --secret=electionmap-database-url \
+  | sed -E 's#@localhost/([^?]*).*#@127.0.0.1:5433/\1#')"
+```
 
 ## Rollback
 
