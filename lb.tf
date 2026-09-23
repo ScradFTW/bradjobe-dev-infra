@@ -28,18 +28,6 @@ resource "google_compute_url_map" "main" {
     path_matcher = "main"
   }
 
-  # Election Map is a whole Next.js app on its own hostname — no path
-  # routing, every request goes to its one backend (electionmap.tf).
-  host_rule {
-    hosts        = [var.electionmap_subdomain]
-    path_matcher = "electionmap"
-  }
-
-  path_matcher {
-    name            = "electionmap"
-    default_service = module.electionmap.backend_service_id
-  }
-
   path_matcher {
     name            = "main"
     default_service = module.bradjobe_site.backend_service_id
@@ -305,6 +293,20 @@ resource "google_compute_url_map" "main" {
         strip_query             = false
       }
     }
+  }
+
+  # Election Map is a whole Next.js app on its own hostname — no path
+  # routing, every request goes to its one backend (electionmap.tf).
+  # Declared after "main" on purpose: path_matcher is an ordered list, and
+  # inserting ahead of it makes the plan diff every existing route.
+  host_rule {
+    hosts        = [var.electionmap_subdomain]
+    path_matcher = "electionmap"
+  }
+
+  path_matcher {
+    name            = "electionmap"
+    default_service = module.electionmap.backend_service_id
   }
 }
 
